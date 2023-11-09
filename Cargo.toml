@@ -1,0 +1,18 @@
+[package]
+name = "diag-convert"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fluent = "0.16.0"
+fluent-bundle = { version = "0.15.2", feature = ["serde"] }
+serde_json = "1.0"
+fluent-syntax = "0.11.0"
+regex = "1.5.4"
+unic-langid = {version = "0.9.1", features = ["unic-langid-macros"]}
+syn = { version = "2.0.39", features = ["extra-traits", "full", "parsing", "visit"] }
+colored = "2.0.4"
+proc-macro2 = { version = "1", features = ["span-locations"] }
+
