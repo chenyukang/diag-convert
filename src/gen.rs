@@ -18,13 +18,17 @@ pub fn gen_code(ftl_file: &str, errors_path: &str, output: Option<String>) -> Re
         errors: vec![],
         fluent_source: HashMap::new(),
         file_source_code: code.to_string(),
-        attrs: vec![],
+        attrs: HashMap::new(),
+        cur_item_name: vec![],
     };
     visitor.init_with_syntax(&syntax);
 
     visitor.set_fluent_source(&parser.entries);
     let result = visitor.gen_source_code();
     if let Some(output) = output {
+        if result.contains("_in_raw_string") {
+            eprintln!("fuck !!");
+        }
         fs::write(output, result)?;
     } else {
         println!("{}", result);

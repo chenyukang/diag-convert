@@ -12,6 +12,7 @@ pub fn replace_slug(content: &str, name: &str, slug: &str, to: &str) -> String {
             format!("label = {} ", to).as_str(),
         );
     };
+
     return result;
 }
 

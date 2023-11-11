@@ -42,7 +42,7 @@ impl Parser {
         for (k, v) in self.childs.iter() {
             entry.add_child(k.to_string(), v.to_string());
         }
-        eprintln!("now add entry: {:#?}", entry);
+        //eprintln!("now add entry: {:#?}", entry);
         if self.entries.iter().any(|e| e.slug == entry.slug) {
             panic!("error duplicated: {:#?}", entry);
         }

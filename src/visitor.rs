@@ -1,13 +1,7 @@
 use crate::utils::get_diag_type;
 use crate::utils::{replace_attr_name, replace_slug};
-
-use quote::quote;
 use regex::Regex;
-
-use std::collections::HashMap;
-
-
-
+use std::collections::{BTreeSet, HashMap};
 use syn::visit::{self, Visit};
 use syn::{Attribute, ItemStruct};
 
@@ -42,7 +36,8 @@ pub struct SynVisitor {
     pub errors: Vec<ErrorStruct>,
     pub fluent_source: HashMap<String, crate::Entry>,
     pub file_source_code: String,
-    pub attrs: Vec<Attribute>,
+    pub cur_item_name: Vec<String>,
+    pub attrs: HashMap<String, Vec<Attribute>>,
 }
 
 impl SynVisitor {
@@ -116,7 +111,7 @@ impl SynVisitor {
 
     pub fn set_fluent_source(&mut self, entries: &Vec<crate::Entry>) {
         for entry in entries.iter() {
-            eprintln!("inesrt entry slug {:#?} =>  {:#?}", entry.slug, entry);
+            eprintln!("insert entry slug {:#?} =>  {:#?}", entry.slug, entry);
             self.fluent_source
                 .insert(entry.slug.to_string(), entry.clone());
         }
@@ -216,6 +211,8 @@ impl SynVisitor {
                 .collect();
             add_labels.extend(error.field_labels.clone());
 
+            add_labels.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+
             for (name, value) in add_labels.iter() {
                 let find_slug = if value == "_" {
                     format!(".{}", name)
@@ -223,9 +220,12 @@ impl SynVisitor {
                     value.to_string()
                 };
                 let slug_value = self.get_slug_value(&entry, &find_slug);
-                //eprintln!("got slug_value: {:#?}  slug: {:#?}", slug_value, find_slug);
                 if let Some(slug_value) = slug_value {
                     // replace slug with value
+                    eprintln!(
+                        "try to replace name {:#?}  find_slug:{:#?}  value: {:#?}",
+                        name, find_slug, slug_value
+                    );
                     result = replace_slug(&result, &name, &find_slug, slug_value.as_str());
 
                     // replace attr with value, like `#[suggestion( ...)]`
@@ -243,30 +243,31 @@ impl SynVisitor {
         }
         return output;
     }
-}
 
-impl<'ast> Visit<'ast> for SynVisitor {
-    fn visit_attribute(&mut self, i: &'ast Attribute) {
-        eprintln!("visiting attr: {:#?}", i);
-        self.attrs.push(i.clone());
-        visit::visit_attribute(self, i);
+    fn cur_diag_name(&self) -> Option<String> {
+        self.cur_item_name.last().map(|x| x.to_string())
     }
 
-    fn visit_item_enum(&mut self, i: &'ast syn::ItemEnum) {
-        eprintln!("Enum with name={:#?}", i);
+    fn process_attrs(&mut self, sub_diags: &Vec<String>) {
         let mut slug = None;
-        let attrs = HashMap::new();
-        let mut field_labels = vec![];
+        let diag_attrs = HashMap::new();
+        let mut field_labels = BTreeSet::new();
         let mut diag_type = None;
-        //let mut sub_diags = vec![];
-        let diag_name = i.ident.to_string();
+        let diag_name = &self.cur_item_name;
 
+        let Some(diag_name) = self.cur_diag_name() else {
+            return;
+        };
+
+        let Some(attrs) = self.attrs.get(&diag_name) else {
+            return;
+        };
+        eprintln!("diag_name now: {:?}", diag_name);
         //eprintln!("attr len: {}", i.attrs.len());
-        if let Some(first_attr) = i.attrs.first() {
+        if let Some(first_attr) = attrs.first() {
             diag_type = get_diag_type(first_attr);
-            //eprintln!("diag_type: {:?}", diag_type);
         }
-        for attr in i.attrs.iter() {
+        for attr in attrs.iter() {
             if attr.path().is_ident("diag")
                 || attr.path().is_ident("multipart_suggestion")
                 || attr.path().is_ident("suggestion")
@@ -283,50 +284,37 @@ impl<'ast> Visit<'ast> for SynVisitor {
                 });
             }
         }
-        for variant in i.variants.iter() {
-            //eprintln!("field: {:#?}", field);
-            for attr in variant.attrs.iter() {
-                if attr.path().is_ident("subdiagnostic") {
-                    let field_name = variant.ident.to_string();
-                    panic!("subdiagnostic: {}", field_name);
-                    //sub_diags.push(field_name);
-                }
-                let variants = vec![
-                    "suggestion",
-                    "label",
-                    "note",
-                    "help",
-                    "multipart_suggestion",
-                    "diag",
-                ];
-                for key in variants.iter() {
-                    eprintln!(
-                        "enum attr path: {:?} key: {}, result: {}",
-                        attr.path(),
-                        key,
-                        attr.path().is_ident(key)
-                    );
-                    if attr.path().is_ident(key) {
-                        let mut added = false;
-                        eprintln!("try to add field label: {}", key);
-                        let _ = attr.parse_nested_meta(|meta| {
-                            if let Some(slug_segment) = meta.path.segments.first() {
-                                let _slug = slug_segment.ident.to_string();
-                                if _slug != "style" && _slug != "code" && _slug != "applicability" {
-                                    //eprintln!("add here {} => {:#?}", key, _slug);
-                                    field_labels.push((key.to_string(), _slug.to_string()));
-                                    added = true;
-                                }
-                            } else {
-                                //eprintln!("Attr with name={:#?}", meta.path);
-                                panic!("not found slug");
+        //eprintln!("field: {:#?}", field);
+        for attr in attrs.iter() {
+            let variants = vec![
+                "suggestion",
+                "label",
+                "note",
+                "help",
+                "multipart_suggestion",
+                "diag",
+            ];
+            for key in variants.iter() {
+                if attr.path().is_ident(key) {
+                    let mut added = false;
+                    eprintln!("try to add field label: {}", key);
+                    let _ = attr.parse_nested_meta(|meta| {
+                        if let Some(slug_segment) = meta.path.segments.first() {
+                            let _slug = slug_segment.ident.to_string();
+                            if _slug != "style" && _slug != "code" && _slug != "applicability" {
+                                //eprintln!("add here {} => {:#?}", key, _slug);
+                                field_labels.insert((key.to_string(), _slug.to_string()));
+                                added = true;
                             }
-                            Ok(())
-                        });
-                        if !added {
-                            //eprintln!("add default label: {}", key);
-                            field_labels.push((key.to_string(), "_".to_string()));
+                        } else {
+                            //eprintln!("Attr with name={:#?}", meta.path);
+                            panic!("not found slug");
                         }
+                        Ok(())
+                    });
+                    if !added {
+                        //eprintln!("add default label: {}", key);
+                        field_labels.insert((key.to_string(), "_".to_string()));
                     }
                 }
             }
@@ -334,77 +322,45 @@ impl<'ast> Visit<'ast> for SynVisitor {
         if let Some(diag_type) = diag_type {
             let error_struct = ErrorStruct {
                 slug,
-                attrs,
-                sub_diags: vec![],
-                field_labels: field_labels,
+                attrs: diag_attrs,
+                sub_diags: sub_diags.clone(),
+                field_labels: field_labels.into_iter().collect(),
                 diag_type,
-                diag_name,
+                diag_name: self.cur_item_name.last().unwrap().to_string(),
                 parent_diag: None,
                 source: "".to_string(),
             };
             //eprintln!("error_struct: {:#?}", error_struct);
             self.errors.push(error_struct);
         }
-        visit::visit_item_enum(self, i);
-        eprintln!("now attributes: {:#?}", self.attrs.len());
-        for attr in self.attrs.iter() {
-            eprintln!("final attr: {:#?}", attr);
+    }
+}
+
+impl<'ast> Visit<'ast> for SynVisitor {
+    fn visit_attribute(&mut self, i: &'ast Attribute) {
+        eprintln!("visiting attr: {:#?}", i);
+        if let Some(diag_name) = self.cur_diag_name() {
+            self.attrs
+                .entry(diag_name)
+                .or_insert_with(|| Vec::new())
+                .push(i.clone());
         }
+        visit::visit_attribute(self, i);
+    }
+
+    fn visit_item_enum(&mut self, i: &'ast syn::ItemEnum) {
+        eprintln!("Enum with name={:#?}", i.ident.to_string());
+        self.cur_item_name.push(i.ident.to_string());
+        self::visit::visit_item_enum(self, i);
+        self.process_attrs(&vec![]);
+        self.cur_item_name.pop();
     }
 
     fn visit_item_struct(&mut self, i: &'ast ItemStruct) {
-        //eprintln!("Struct with name={:#?}", i);
-        let token_stream = quote! { #i };
-        let mut slug = None;
+        eprintln!("Struct with name={:#?}", i.ident.to_string());
+        self.cur_item_name.push(i.ident.to_string());
         let mut sub_diags = vec![];
-        let mut attrs = HashMap::new();
-        let mut field_labels = vec![];
-        let mut diag_type = None;
-        let diag_name = i.ident.to_string();
-        //eprintln!("attr len: {}", i.attrs.len());
-        if let Some(first_attr) = i.attrs.first() {
-            diag_type = get_diag_type(first_attr);
-            //eprintln!("diag_type: {:?}", diag_type);
-        }
-        for attr in i.attrs.iter() {
-            if attr.path().is_ident("diag")
-                || attr.path().is_ident("multipart_suggestion")
-                || attr.path().is_ident("suggestion")
-            {
-                let _ = attr.parse_nested_meta(|meta| {
-                    //eprintln!("Attr with name={:#?}", meta.path);
-                    let first_segment = meta.path.segments.first().unwrap();
-                    let _slug = first_segment.ident.to_string();
-                    //eprintln!("Attr with name={:#?}", _slug);
-                    if slug.is_none() {
-                        slug = Some(_slug);
-                    }
-                    Ok(())
-                });
-            }
-            let keys = vec!["warn", "label", "note", "help"];
-            for k in keys.iter() {
-                if attr.path().is_ident(k) {
-                    let _ = attr.parse_nested_meta(|meta| {
-                        //eprintln!("Attr with name={:#?}", meta.path);
-                        let first_segment = meta.path.segments.first().unwrap();
-                        let _slug = first_segment.ident.to_string();
-                        //eprintln!("Attr with name={:#?}", _slug);
-                        if !_slug.is_empty() {
-                            if !attrs.contains_key(&k.to_string()) {
-                                attrs.insert(k.to_string(), _slug);
-                            }
-                        }
-                        Ok(())
-                    });
-                    if !attrs.contains_key(&k.to_string()) {
-                        attrs.insert(k.to_string(), "_".to_string());
-                    }
-                }
-            }
-        }
         for field in i.fields.iter() {
-            //eprintln!("field: {:#?}", field);
             for attr in field.attrs.iter() {
                 if attr.path().is_ident("subdiagnostic") {
                     let field_name = field.ident.as_ref().unwrap().to_string();
@@ -413,50 +369,12 @@ impl<'ast> Visit<'ast> for SynVisitor {
                     let subdiag_struct = crate::utils::get_ty_path(field_ty);
                     sub_diags.push(subdiag_struct);
                 }
-                let variants = vec!["suggestion", "label", "note", "help"];
-                for key in variants.iter() {
-                    //eprintln!("now attr.path() : {:#?}", attr.path());
-                    if attr.path().is_ident(key) {
-                        let mut added = false;
-                        let _ = attr.parse_nested_meta(|meta| {
-                            //eprintln!("Attr with name={:#?}", meta.path);
-                            if let Some(slug_segment) = meta.path.segments.first() {
-                                let _slug = slug_segment.ident.to_string();
-                                if _slug != "style" && _slug != "code" && _slug != "applicability" {
-                                    eprintln!("add field label {} => {:#?}", key, _slug);
-                                    field_labels.push((key.to_string(), _slug));
-                                    added = true;
-                                }
-                            } else {
-                                eprintln!("Attr with name={:#?}", meta.path);
-                                panic!("not found slug");
-                            }
-                            Ok(())
-                        });
-                        if !added {
-                            eprintln!("add default label: {}", key);
-                            field_labels.push((key.to_string(), "_".to_string()));
-                        }
-                    }
-                }
             }
         }
 
-        if let Some(diag_type) = diag_type {
-            let error_struct = ErrorStruct {
-                slug,
-                attrs,
-                sub_diags: sub_diags,
-                field_labels,
-                diag_type,
-                diag_name,
-                parent_diag: None,
-                source: "".to_string(),
-            };
-            //eprintln!("error_struct: {:#?}", error_struct);
-            self.errors.push(error_struct);
-        }
-        //eprintln!("struct slug: {:#?}", i);
+        self::visit::visit_item_struct(self, i);
+        self.process_attrs(&sub_diags);
+        self.cur_item_name.pop();
         visit::visit_item_struct(self, i);
     }
 }

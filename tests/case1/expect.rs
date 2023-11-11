@@ -1609,24 +1609,24 @@ pub(crate) struct DefaultNotFollowedByItem {
 
 #[derive(Diagnostic)]
 pub(crate) enum MissingKeywordForItemDefinition {
-    #[diag(label = "missing `struct` for struct definition" )]
+    #[diag(label = "missing `struct` for struct definition")]
     Struct {
         #[primary_span]
-        #[suggestion(style = "short", applicability = "maybe-incorrect", code = " struct ")]
+        #[suggestion(label = "add `struct` here to parse `{$ident}` as a public struct", style = "short", applicability = "maybe-incorrect", code = " struct ")]
         span: Span,
         ident: Ident,
     },
     #[diag(label = "missing `fn` for function definition" )]
     Function {
         #[primary_span]
-        #[suggestion(style = "short", applicability = "maybe-incorrect", code = " fn ")]
+        #[suggestion(label = "add `struct` here to parse `{$ident}` as a public struct", style = "short", applicability = "maybe-incorrect", code = " fn ")]
         span: Span,
         ident: Ident,
     },
     #[diag(label = "missing `fn` for method definition" )]
     Method {
         #[primary_span]
-        #[suggestion(style = "short", applicability = "maybe-incorrect", code = " fn ")]
+        #[suggestion(label = "add `struct` here to parse `{$ident}` as a public struct", style = "short", applicability = "maybe-incorrect", code = " fn ")]
         span: Span,
         ident: Ident,
     },
@@ -1794,38 +1794,38 @@ pub(crate) struct EnumStructMutuallyExclusive {
 
 #[derive(Diagnostic)]
 pub(crate) enum UnexpectedTokenAfterStructName {
-    #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found reserved identifier `{$token}`" )]
+    #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found reserved identifier `{$token}`")]
     ReservedIdentifier {
         #[primary_span]
-        #[label(parse_unexpected_token_after_struct_name)]
+        #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
     #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found keyword `{$token}`" )]
     Keyword {
         #[primary_span]
-        #[label(parse_unexpected_token_after_struct_name)]
+        #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
     #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found reserved keyword `{$token}`" )]
     ReservedKeyword {
         #[primary_span]
-        #[label(parse_unexpected_token_after_struct_name)]
+        #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
     #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found doc comment `{$token}`" )]
     DocComment {
         #[primary_span]
-        #[label(parse_unexpected_token_after_struct_name)]
+        #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
     #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found `{$token}`" )]
     Other {
         #[primary_span]
-        #[label(parse_unexpected_token_after_struct_name)]
+        #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
@@ -1872,7 +1872,7 @@ pub(crate) struct MultipleWhereClauses {
 
 #[derive(Diagnostic)]
 pub(crate) enum UnexpectedNonterminal {
-    #[diag(label = "expected an item keyword" )]
+    #[diag(label = "expected an item keyword")]
     Item(#[primary_span] Span),
     #[diag(label = "expected a statement" )]
     Statement(#[primary_span] Span),
@@ -1892,7 +1892,7 @@ pub(crate) enum UnexpectedNonterminal {
 
 #[derive(Diagnostic)]
 pub(crate) enum TopLevelOrPatternNotAllowed {
-    #[diag(label = "top-level or-patterns are not allowed in `let` bindings" )]
+    #[diag(label = "top-level or-patterns are not allowed in `let` bindings")]
     LetBinding {
         #[primary_span]
         span: Span,
@@ -2060,11 +2060,14 @@ pub struct UnknownTokenNull;
 
 #[derive(Diagnostic)]
 pub enum UnescapeError {
-    #[diag(label = "invalid unicode character escape" )]
-    #[help]
+    #[diag(label = "invalid unicode character escape")]
+    #[help("unicode escape must {$surrogate ->
+[true] not be a surrogate
+*[false] be at most 10FFFF
+}")]
     InvalidUnicodeEscape {
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         span: Span,
         surrogate: bool,
     },
@@ -2095,10 +2098,7 @@ pub enum UnescapeError {
         span: Span,
         double_quotes: bool,
     },
-    #[diag(label = "{$double_quotes ->
-[true] bare CR not allowed in string, use `\r` instead
-*[false] character constant must be escaped: `\r`
-}" _in_raw_string)]
+    #[diag(label = "bare CR not allowed in raw string" )]
     BareCrRawString(#[primary_span] Span),
     #[diag(label = "numeric character escape is too short" )]
     TooShortHexEscape(#[primary_span] Span),
@@ -2108,7 +2108,7 @@ pub enum UnescapeError {
 } escape: `{$ch}`" )]
     InvalidCharInEscape {
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         span: Span,
         is_hex: bool,
         ch: String,
@@ -2116,26 +2116,26 @@ pub enum UnescapeError {
     #[diag(label = "out of range hex escape" )]
     OutOfRangeHexEscape(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
     ),
     #[diag(label = "invalid start of unicode escape: `_`" )]
     LeadingUnderscoreUnicodeEscape {
         #[primary_span]
-        #[label(label = "invalid start of unicode escape: `_`" _label)]
+        #[label("invalid start of unicode escape")]
         span: Span,
         ch: String,
     },
     #[diag(label = "overlong unicode escape" )]
     OverlongUnicodeEscape(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
     ),
     #[diag(label = "unterminated unicode escape" )]
     UnclosedUnicodeEscape(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
         #[suggestion(
             parse_terminate,
@@ -2149,48 +2149,51 @@ pub enum UnescapeError {
     NoBraceInUnicodeEscape {
         #[primary_span]
         span: Span,
-        #[label]
+        #[label("invalid escape")]
         label: Option<Span>,
         #[subdiagnostic]
         sub: NoBraceUnicodeSub,
     },
     #[diag(label = "unicode escape in byte string" )]
-    #[help]
+    #[help("unicode escape must {$surrogate ->
+[true] not be a surrogate
+*[false] be at most 10FFFF
+}")]
     UnicodeEscapeInByte(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
     ),
     #[diag(label = "empty unicode escape" )]
     EmptyUnicodeEscape(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
     ),
     #[diag(label = "empty character literal" )]
     ZeroChars(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
     ),
     #[diag(label = "invalid trailing slash in literal" )]
     LoneSlash(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
     ),
     #[diag(label = "whitespace symbol '{$ch}' is not skipped" )]
     UnskippedWhitespace {
         #[primary_span]
         span: Span,
-        #[label]
+        #[label("invalid escape")]
         char_span: Span,
         ch: String,
     },
     #[diag(label = "multiple lines skipped by escaped newline" )]
     MultipleSkippedLinesWarning(
         #[primary_span]
-        #[label]
+        #[label("invalid escape")]
         Span,
     ),
     #[diag(label = "character literal may only contain one codepoint" )]
@@ -2388,11 +2391,11 @@ pub(crate) struct RefMutOrderIncorrect {
 
 #[derive(Diagnostic)]
 pub(crate) enum InvalidMutInPattern {
-    #[diag(label = "`mut` must be attached to each individual binding" )]
+    #[diag(label = "`mut` must be attached to each individual binding")]
     #[note("`mut` may be followed by `variable` and `variable @ pattern`")]
     NestedIdent {
         #[primary_span]
-        #[suggestion(code = "{pat}", applicability = "machine-applicable")]
+        #[suggestion(label = "add `mut` to each binding", code = "{pat}", applicability = "machine-applicable")]
         span: Span,
         pat: String,
     },
@@ -2400,7 +2403,7 @@ pub(crate) enum InvalidMutInPattern {
     #[note("`mut` may be followed by `variable` and `variable @ pattern`")]
     NonIdent {
         #[primary_span]
-        #[suggestion(code = "{pat}", applicability = "machine-applicable")]
+        #[suggestion(label = "add `mut` to each binding", code = "{pat}", applicability = "machine-applicable")]
         span: Span,
         pat: String,
     },
