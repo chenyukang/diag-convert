@@ -37,6 +37,7 @@ dependencies = [
  "fluent-bundle",
  "fluent-syntax",
  "proc-macro2",
+ "quote",
  "regex",
  "serde_json",
  "syn 2.0.39",

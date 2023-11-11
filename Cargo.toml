@@ -15,4 +15,5 @@ unic-langid = {version = "0.9.1", features = ["unic-langid-macros"]}
 syn = { version = "2.0.39", features = ["extra-traits", "full", "parsing", "visit"] }
 colored = "2.0.4"
 proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1.0.33"
 
