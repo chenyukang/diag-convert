@@ -111,7 +111,7 @@ impl SynVisitor {
 
     pub fn set_fluent_source(&mut self, entries: &Vec<crate::Entry>) {
         for entry in entries.iter() {
-            eprintln!("insert entry slug {:#?} =>  {:#?}", entry.slug, entry);
+            //eprintln!("insert entry slug {:#?} =>  {:#?}", entry.slug, entry);
             self.fluent_source
                 .insert(entry.slug.to_string(), entry.clone());
         }
@@ -151,10 +151,10 @@ impl SynVisitor {
         let slug = error_struct.slug.clone();
         if let Some(slug) = slug {
             if let Some(entry) = self.fluent_source.get(&slug) {
-                eprintln!(
-                    "get_entry_from_slug got entry: {:#?}\n by slug: {:?}",
-                    entry, slug
-                );
+                // eprintln!(
+                //     "get_entry_from_slug got entry: {:#?}\n by slug: {:?}",
+                //     entry, slug
+                // );
                 return Some(entry);
             }
         }
@@ -180,7 +180,7 @@ impl SynVisitor {
         //let mut output = "".to_string();
         let mut error_struct_outputs = vec![];
         for error in self.errors.iter() {
-            error.print();
+            //error.print();
             let entry = self.get_entry_from_slug(error);
             if entry.is_none() {
                 eprintln!(
@@ -197,10 +197,6 @@ impl SynVisitor {
                 let value = self.get_slug_value(&entry, &slug);
                 //eprintln!("got slug_value: {:#?}  slug: {:#?}", value, slug);
                 if let Some(slug_value) = value {
-                    result = result.replace(
-                        format!("diag({})", slug).as_str(),
-                        format!("diag(label = {})", slug_value).as_str(),
-                    );
                     result = replace_slug(&result, "", &slug, slug_value.as_str());
                 }
             }
@@ -211,7 +207,7 @@ impl SynVisitor {
                 .collect();
             add_labels.extend(error.field_labels.clone());
 
-            add_labels.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+            //add_labels.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
 
             for (name, value) in add_labels.iter() {
                 let find_slug = if value == "_" {
@@ -222,15 +218,15 @@ impl SynVisitor {
                 let slug_value = self.get_slug_value(&entry, &find_slug);
                 if let Some(slug_value) = slug_value {
                     // replace slug with value
-                    eprintln!(
-                        "try to replace name {:#?}  find_slug:{:#?}  value: {:#?}",
-                        name, find_slug, slug_value
-                    );
-                    result = replace_slug(&result, &name, &find_slug, slug_value.as_str());
-
+                    // eprintln!(
+                    //     "try to replace name {:#?}  find_slug:{:#?}  value: {:#?}",
+                    //     name, find_slug, slug_value
+                    // );
                     // replace attr with value, like `#[suggestion( ...)]`
                     if value == "_" {
                         result = replace_attr_name(&result, name, slug_value.as_str());
+                    } else {
+                        result = replace_slug(&result, &name, &find_slug, slug_value.as_str());
                     }
                 }
             }
@@ -262,7 +258,6 @@ impl SynVisitor {
         let Some(attrs) = self.attrs.get(&diag_name) else {
             return;
         };
-        eprintln!("diag_name now: {:?}", diag_name);
         //eprintln!("attr len: {}", i.attrs.len());
         if let Some(first_attr) = attrs.first() {
             diag_type = get_diag_type(first_attr);
@@ -297,7 +292,6 @@ impl SynVisitor {
             for key in variants.iter() {
                 if attr.path().is_ident(key) {
                     let mut added = false;
-                    eprintln!("try to add field label: {}", key);
                     let _ = attr.parse_nested_meta(|meta| {
                         if let Some(slug_segment) = meta.path.segments.first() {
                             let _slug = slug_segment.ident.to_string();
@@ -338,7 +332,7 @@ impl SynVisitor {
 
 impl<'ast> Visit<'ast> for SynVisitor {
     fn visit_attribute(&mut self, i: &'ast Attribute) {
-        eprintln!("visiting attr: {:#?}", i);
+        //visiting attr: {:#?}", i);
         if let Some(diag_name) = self.cur_diag_name() {
             self.attrs
                 .entry(diag_name)
