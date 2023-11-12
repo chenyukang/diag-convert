@@ -2,9 +2,9 @@ use crate::utils::get_diag_type;
 use crate::utils::{replace_attr_name, replace_slug};
 use regex::Regex;
 use std::collections::{BTreeSet, HashMap};
+use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{Attribute, ItemStruct};
-
 #[derive(Debug)]
 pub struct ErrorStruct {
     pub slug: Option<String>,
@@ -27,7 +27,6 @@ impl ErrorStruct {
         eprintln!("parent_diag: {:#?}", self.parent_diag);
         eprintln!("attrs: {:#?}", self.attrs);
         eprintln!("field_labels: {:#?}", self.field_labels);
-        eprintln!("source: {:}", self.source);
         eprintln!("--------------------------------");
     }
 }
@@ -36,7 +35,8 @@ pub struct SynVisitor {
     pub errors: Vec<ErrorStruct>,
     pub fluent_source: HashMap<String, crate::Entry>,
     pub file_source_code: String,
-    pub cur_item_name: Vec<String>,
+    pub cur_item_name: Vec<(String, String)>,
+    pub cur_source: Vec<String>,
     pub attrs: HashMap<String, Vec<Attribute>>,
 }
 
@@ -44,7 +44,6 @@ impl SynVisitor {
     pub fn init_with_syntax(&mut self, syntax: &syn::File) {
         self.visit_file(&syntax);
         self.set_parent_diag();
-        self.set_source_code();
     }
 
     pub fn find_error_by_diag_name(&self, diag_name: &str) -> Option<usize> {
@@ -72,63 +71,31 @@ impl SynVisitor {
         }
     }
 
-    pub fn set_source_code(&mut self) {
-        let code = self.file_source_code.to_string();
-        let lines = code.lines().collect::<Vec<_>>();
-        let mut map = HashMap::new();
-        for (index, error) in self.errors.iter().enumerate() {
-            let diag_name = error.diag_name.clone();
-            let mut start = 0;
-            let mut source = vec![];
-            for (index, line) in lines.iter().enumerate() {
-                if line.contains(&diag_name) && line.starts_with("pub") {
-                    start = index;
-                    break;
-                }
-            }
-            while start > 0 {
-                start -= 1;
-                if lines[start].starts_with("#[derive") {
-                    break;
-                }
-            }
-            //eprintln!("name: {} start: {}", diag_name, start);
-            for (index, line) in lines.iter().enumerate() {
-                if index >= start {
-                    source.push(line.to_string());
-                }
-                //eprintln!("now index: {}, start: {}", lines[index], start - 1);
-                if index > start && line.trim() == "" && lines[index - 1].trim() == "}" {
-                    break;
-                }
-            }
-            map.insert(index, source.join("\n"));
-        }
-        for (index, source) in map.iter() {
-            self.errors[*index].source = source.to_string();
-        }
-    }
-
     pub fn set_fluent_source(&mut self, entries: &Vec<crate::Entry>) {
-        for entry in entries.iter() {
-            //eprintln!("insert entry slug {:#?} =>  {:#?}", entry.slug, entry);
-            self.fluent_source
-                .insert(entry.slug.to_string(), entry.clone());
-        }
+        let mut entries = entries.clone();
+        let kv: HashMap<String, String> = entries
+            .iter()
+            .map(|e| (e.slug.to_string(), e.value.to_string()))
+            .collect();
+
         let childs = entries
             .iter()
             .map(|e| (e.slug.to_string(), e.value.to_string()))
             .collect::<Vec<_>>();
-        let mut fixed_childs = vec![];
-        for (slug, value) in childs.iter() {
+        let root_entry = crate::Entry {
+            slug: "*root*".to_string(),
+            value: "".to_string(),
+            childs: childs.clone(),
+        };
+        entries.push(root_entry.clone());
+
+        let fix_vars = |value: &str| {
             let re = Regex::new(r"\{(\w+)\}").unwrap();
             let mut change = vec![];
             for mat in re.captures_iter(value) {
-                for (k, v) in childs.iter() {
-                    if k == &mat[1] {
-                        change.push((mat[1].to_string(), v.to_string()));
-                        break;
-                    }
+                if let Some(v) = kv.get(&mat[1]) {
+                    eprintln!("now change {:#?} => {:#?}", &mat[1], v);
+                    change.push((mat[1].to_string(), v.to_string()));
                 }
             }
             let mut fixed = value.to_string();
@@ -136,23 +103,35 @@ impl SynVisitor {
                 let from = format!("{{{}}}", mat);
                 fixed = fixed.replace(&from, value);
             }
-            fixed_childs.push((slug.to_string(), fixed));
-        }
-        let root_entry = crate::Entry {
-            slug: "*root*".to_string(),
-            value: "".to_string(),
-            childs: fixed_childs,
+            fixed
         };
-        self.fluent_source.insert("*root*".to_string(), root_entry);
-        // set root variables
+        for i in 0..entries.len() {
+            let entry = entries.get_mut(i).unwrap();
+            let mut new_childs = vec![];
+            for (slug, value) in entry.childs.iter() {
+                let fixed = fix_vars(value);
+                new_childs.push((slug.to_string(), fixed));
+            }
+            entry.childs = new_childs;
+            entry.value = fix_vars(&entry.value);
+        }
+
+        for entry in entries.iter() {
+            //eprintln!("insert entry slug {:#?} =>  {:#?}", entry.slug, entry);
+            self.fluent_source
+                .insert(entry.slug.to_string(), entry.clone());
+        }
+
+        let res = self.fluent_source.get("parse_invalid_char_in_escape");
+        eprintln!("now fuck one: {:#?}", res);
     }
 
-    fn get_entry_from_slug(&self, error_struct: &ErrorStruct) -> Option<&crate::Entry> {
+    fn get_entry_from_struct(&self, error_struct: &ErrorStruct) -> Option<&crate::Entry> {
         let slug = error_struct.slug.clone();
         if let Some(slug) = slug {
             if let Some(entry) = self.fluent_source.get(&slug) {
                 // eprintln!(
-                //     "get_entry_from_slug got entry: {:#?}\n by slug: {:?}",
+                //     "get_entry_from_struct got entry: {:#?}\n by slug: {:?}",
                 //     entry, slug
                 // );
                 return Some(entry);
@@ -160,20 +139,36 @@ impl SynVisitor {
         }
 
         if let Some(parent_name) = &error_struct.parent_diag {
-            //eprintln!("got parent_diag: {:?}", parent_name);
+            // eprintln!(
+            //     "got parent_diag: {:#?} {:?}",
+            //     error_struct.slug, parent_name
+            // );
             let parent_index = self.find_error_by_diag_name(parent_name).unwrap();
-            self.get_entry_from_slug(self.errors.get(parent_index).unwrap())
+            self.get_entry_from_struct(self.errors.get(parent_index).unwrap())
         } else {
             return self.fluent_source.get("*root*");
         }
     }
 
-    fn get_slug_value(&self, entry: &crate::Entry, slug: &str) -> Option<String> {
-        if let Some(value) = entry.get_value_from_slug(slug) {
-            return Some(value);
+    fn get_value(&self, error: &ErrorStruct, slug: &str) -> Option<String> {
+        if let Some(entry) = self.get_entry_from_struct(error) {
+            if let Some(v) = entry.get_value_from_slug(slug) {
+                return Some(v);
+            }
+        } else {
+            if let Some(parent_name) = &error.parent_diag {
+                let parent_index = self.find_error_by_diag_name(parent_name).unwrap();
+                if let Some(parent) =
+                    self.get_entry_from_struct(self.errors.get(parent_index).unwrap())
+                {
+                    if let Some(v) = parent.get_value_from_slug(slug) {
+                        return Some(v);
+                    }
+                }
+            }
         }
         let root = self.fluent_source.get("*root*").unwrap();
-        return root.get_value_from_slug(slug);
+        root.get_value_from_slug(slug)
     }
 
     pub fn gen_source_code(&self) -> String {
@@ -181,25 +176,16 @@ impl SynVisitor {
         let mut error_struct_outputs = vec![];
         for error in self.errors.iter() {
             //error.print();
-            let entry = self.get_entry_from_slug(error);
-            if entry.is_none() {
+            let Some(entry) = self.get_entry_from_struct(error) else {
                 eprintln!(
                     "no entry for error: {:#?} slug: {:?}",
                     error.diag_name, error.slug
                 );
                 continue;
-            }
-            //eprintln!("entry: {:#?}", entry);
-            let entry = entry.unwrap();
+            };
             let mut result = error.source.clone();
             let slug = error.slug.clone();
-            if let Some(slug) = slug {
-                let value = self.get_slug_value(&entry, &slug);
-                //eprintln!("got slug_value: {:#?}  slug: {:#?}", value, slug);
-                if let Some(slug_value) = value {
-                    result = replace_slug(&result, "", &slug, slug_value.as_str());
-                }
-            }
+
             let mut add_labels: Vec<(String, String)> = error
                 .attrs
                 .iter()
@@ -207,7 +193,14 @@ impl SynVisitor {
                 .collect();
             add_labels.extend(error.field_labels.clone());
 
-            //add_labels.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+            if let Some(slug) = slug {
+                let value = self.get_value(&error, &slug);
+                if let Some(slug_value) = value {
+                    add_labels.push((slug, slug_value));
+                }
+            }
+
+            add_labels.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
 
             for (name, value) in add_labels.iter() {
                 let find_slug = if value == "_" {
@@ -215,19 +208,24 @@ impl SynVisitor {
                 } else {
                     value.to_string()
                 };
-                let slug_value = self.get_slug_value(&entry, &find_slug);
+                let slug_value = self.get_value(&error, &find_slug);
+                eprintln!(
+                    "all_labels find_slug: {:#?} => slug_value: {:#?}",
+                    find_slug, slug_value
+                );
                 if let Some(slug_value) = slug_value {
-                    // replace slug with value
-                    // eprintln!(
-                    //     "try to replace name {:#?}  find_slug:{:#?}  value: {:#?}",
-                    //     name, find_slug, slug_value
-                    // );
-                    // replace attr with value, like `#[suggestion( ...)]`
                     if value == "_" {
                         result = replace_attr_name(&result, name, slug_value.as_str());
                     } else {
-                        result = replace_slug(&result, &name, &find_slug, slug_value.as_str());
+                        result = replace_slug(&result, &find_slug, slug_value.as_str());
                     }
+                } else {
+                    eprintln!("not found slug_value: {}", find_slug);
+                    eprintln!(
+                        "not found slug_value find_slug: {:#?} => slug_value: {:#?}",
+                        find_slug, slug_value
+                    );
+                    //panic!("none error now");
                 }
             }
             error_struct_outputs.push((error.source.to_string(), result));
@@ -241,7 +239,23 @@ impl SynVisitor {
     }
 
     fn cur_diag_name(&self) -> Option<String> {
-        self.cur_item_name.last().map(|x| x.to_string())
+        let last = self.cur_item_name.last();
+        if let Some((name, ty)) = last {
+            if ty == "Enum" || ty == "Struct" {
+                return Some(name.to_string());
+            } else {
+                // a variant, try to find previous item
+                if self.cur_item_name.len() >= 2 {
+                    for (parent_name, ty) in self.cur_item_name.iter().rev() {
+                        if ty == "Enum" || ty == "Struct" {
+                            let new_name = format!("{}::{}", parent_name, name);
+                            return Some(new_name);
+                        }
+                    }
+                }
+            }
+        }
+        return None;
     }
 
     fn process_attrs(&mut self, sub_diags: &Vec<String>) {
@@ -249,7 +263,6 @@ impl SynVisitor {
         let diag_attrs = HashMap::new();
         let mut field_labels = BTreeSet::new();
         let mut diag_type = None;
-        let diag_name = &self.cur_item_name;
 
         let Some(diag_name) = self.cur_diag_name() else {
             return;
@@ -258,7 +271,6 @@ impl SynVisitor {
         let Some(attrs) = self.attrs.get(&diag_name) else {
             return;
         };
-        //eprintln!("attr len: {}", i.attrs.len());
         if let Some(first_attr) = attrs.first() {
             diag_type = get_diag_type(first_attr);
         }
@@ -279,6 +291,7 @@ impl SynVisitor {
                 });
             }
         }
+        //eprint!("diag_name: {:#?}, slug: {:#?}", diag_name, slug);
         //eprintln!("field: {:#?}", field);
         for attr in attrs.iter() {
             let variants = vec![
@@ -313,6 +326,16 @@ impl SynVisitor {
                 }
             }
         }
+        // eprintln!("diag_name: {:#?}", diag_name);
+        // eprintln!("field_labels: {:#?}", field_labels);
+        // eprintln!("diag_type: {:?}", diag_type);
+        let parent_diag = if self.cur_item_name.len() >= 2 {
+            self.cur_item_name
+                .get(self.cur_item_name.len() - 2)
+                .map(|x| x.0.to_string())
+        } else {
+            None
+        };
         if let Some(diag_type) = diag_type {
             let error_struct = ErrorStruct {
                 slug,
@@ -320,9 +343,9 @@ impl SynVisitor {
                 sub_diags: sub_diags.clone(),
                 field_labels: field_labels.into_iter().collect(),
                 diag_type,
-                diag_name: self.cur_item_name.last().unwrap().to_string(),
-                parent_diag: None,
-                source: "".to_string(),
+                diag_name,
+                parent_diag,
+                source: self.cur_source.last().unwrap().to_string(),
             };
             //eprintln!("error_struct: {:#?}", error_struct);
             self.errors.push(error_struct);
@@ -332,7 +355,9 @@ impl SynVisitor {
 
 impl<'ast> Visit<'ast> for SynVisitor {
     fn visit_attribute(&mut self, i: &'ast Attribute) {
-        //visiting attr: {:#?}", i);
+        // eprintln!("cur_diag_name: {:#?}", self.cur_diag_name());
+        // eprintln!("visiting attr: {:#?}", i);
+
         if let Some(diag_name) = self.cur_diag_name() {
             self.attrs
                 .entry(diag_name)
@@ -344,15 +369,49 @@ impl<'ast> Visit<'ast> for SynVisitor {
 
     fn visit_item_enum(&mut self, i: &'ast syn::ItemEnum) {
         eprintln!("Enum with name={:#?}", i.ident.to_string());
-        self.cur_item_name.push(i.ident.to_string());
+        let span = i.span();
+        let source = i.span().source_text().unwrap().to_string();
+        self.cur_item_name
+            .push((i.ident.to_string(), "Enum".to_string()));
+        self.cur_source.push(source);
+
         self::visit::visit_item_enum(self, i);
         self.process_attrs(&vec![]);
         self.cur_item_name.pop();
+        self.cur_source.pop();
+    }
+
+    fn visit_variant(&mut self, i: &'ast syn::Variant) {
+        eprintln!("Variant with name={:#?}", i.ident.to_string());
+        let source = i.span().source_text().unwrap().to_string();
+        self.cur_item_name
+            .push((i.ident.to_string(), "Variant".to_string()));
+        self.cur_source.push(source);
+
+        let mut sub_diags = vec![];
+        for field in i.fields.iter() {
+            for attr in field.attrs.iter() {
+                if attr.path().is_ident("subdiagnostic") {
+                    let field_name = field.ident.as_ref().unwrap().to_string();
+                    let field_ty = &field.ty;
+                    //eprintln!("subdiagnostic: {} {:#?}", field_name, field_ty);
+                    let subdiag_struct = crate::utils::get_ty_path(field_ty);
+                    sub_diags.push(subdiag_struct);
+                }
+            }
+        }
+        self::visit::visit_variant(self, i);
+        self.process_attrs(&sub_diags);
+        self.cur_item_name.pop();
+        self.cur_source.pop();
     }
 
     fn visit_item_struct(&mut self, i: &'ast ItemStruct) {
         eprintln!("Struct with name={:#?}", i.ident.to_string());
-        self.cur_item_name.push(i.ident.to_string());
+        self.cur_item_name
+            .push((i.ident.to_string(), "Struct".to_string()));
+        self.cur_source
+            .push(i.span().source_text().unwrap().to_string());
         let mut sub_diags = vec![];
         for field in i.fields.iter() {
             for attr in field.attrs.iter() {
@@ -369,6 +428,6 @@ impl<'ast> Visit<'ast> for SynVisitor {
         self::visit::visit_item_struct(self, i);
         self.process_attrs(&sub_diags);
         self.cur_item_name.pop();
-        visit::visit_item_struct(self, i);
+        self.cur_source.pop();
     }
 }

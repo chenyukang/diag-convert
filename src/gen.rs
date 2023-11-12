@@ -21,6 +21,7 @@ pub fn gen_code(ftl_file: &str, errors_path: &str, output: Option<String>) -> Re
         file_source_code: code.to_string(),
         attrs: HashMap::new(),
         cur_item_name: vec![],
+        cur_source: vec![],
     };
     visitor.init_with_syntax(&syntax);
 

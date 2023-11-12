@@ -1487,10 +1487,10 @@ pub(crate) struct UnexpectedIfWithIf(
 );
 
 #[derive(Diagnostic)]
-#[diag(parse_maybe_fn_typo_with_impl)]
+#[diag("you might have meant to write `impl` instead of `fn`")]
 pub(crate) struct FnTypoWithImpl {
     #[primary_span]
-    #[suggestion(label = "remove the `if`", applicability = "maybe-incorrect", code = "impl", style = "verbose")]
+    #[suggestion(label = "replace `fn` with `impl` here", applicability = "maybe-incorrect", code = "impl", style = "verbose")]
     pub fn_span: Span,
 }
 
@@ -1619,14 +1619,14 @@ pub(crate) enum MissingKeywordForItemDefinition {
     #[diag("missing `fn` for function definition")]
     Function {
         #[primary_span]
-        #[suggestion(label = "add `struct` here to parse `{$ident}` as a public struct", style = "short", applicability = "maybe-incorrect", code = " fn ")]
+        #[suggestion(label = "add `fn` here to parse `{$ident}` as a public function", style = "short", applicability = "maybe-incorrect", code = " fn ")]
         span: Span,
         ident: Ident,
     },
     #[diag("missing `fn` for method definition")]
     Method {
         #[primary_span]
-        #[suggestion(label = "add `struct` here to parse `{$ident}` as a public struct", style = "short", applicability = "maybe-incorrect", code = " fn ")]
+        #[suggestion(label = "add `fn` here to parse `{$ident}` as a public method", style = "short", applicability = "maybe-incorrect", code = " fn ")]
         span: Span,
         ident: Ident,
     },
@@ -1642,7 +1642,7 @@ pub(crate) enum MissingKeywordForItemDefinition {
 #[derive(Subdiagnostic)]
 pub(crate) enum AmbiguousMissingKwForItemSub {
     #[suggestion(
-        parse_suggestion,
+        label = "if you meant to call a macro, try" ,
         applicability = "maybe-incorrect",
         code = "{snippet}!"
     )]
@@ -1651,7 +1651,7 @@ pub(crate) enum AmbiguousMissingKwForItemSub {
         span: Span,
         snippet: String,
     },
-    #[help(parse_help)]
+    #[help("if you meant to call a macro, remove the `pub` and add a trailing `!` after the identifier")]
     HelpMacro,
 }
 
@@ -2079,7 +2079,7 @@ pub enum UnescapeError {
         #[primary_span]
         span: Span,
         #[suggestion(
-            parse_escape,
+            label = "escape the character" ,
             applicability = "machine-applicable",
             code = "{escaped_sugg}"
         )]
@@ -2094,7 +2094,7 @@ pub enum UnescapeError {
 }")]
     BareCr {
         #[primary_span]
-        #[suggestion(parse_escape, applicability = "machine-applicable", code = "\\r")]
+        #[suggestion(label = "escape the character" , applicability = "machine-applicable", code = "\\r")]
         span: Span,
         double_quotes: bool,
     },
@@ -2108,7 +2108,10 @@ pub enum UnescapeError {
 } escape: `{$ch}`")]
     InvalidCharInEscape {
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("invalid character in {$is_hex ->
+[true] numeric character
+*[false] unicode
+} escape")]
         span: Span,
         is_hex: bool,
         ch: String,
@@ -2116,7 +2119,7 @@ pub enum UnescapeError {
     #[diag("out of range hex escape")]
     OutOfRangeHexEscape(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("must be a character in the range [\x00-\x7f]")]
         Span,
     ),
     #[diag("invalid start of unicode escape: `_`")]
@@ -2129,16 +2132,16 @@ pub enum UnescapeError {
     #[diag("overlong unicode escape")]
     OverlongUnicodeEscape(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("must have at most 6 hex digits")]
         Span,
     ),
     #[diag("unterminated unicode escape")]
     UnclosedUnicodeEscape(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("missing a closing `}`")]
         Span,
         #[suggestion(
-            parse_terminate,
+            label = "terminate the unicode escape" ,
             code = "}}",
             applicability = "maybe-incorrect",
             style = "verbose"
@@ -2149,51 +2152,48 @@ pub enum UnescapeError {
     NoBraceInUnicodeEscape {
         #[primary_span]
         span: Span,
-        #[label("invalid escape")]
+        #[label("incorrect unicode escape sequence")]
         label: Option<Span>,
         #[subdiagnostic]
         sub: NoBraceUnicodeSub,
     },
     #[diag("unicode escape in byte string")]
-    #[help("unicode escape must {$surrogate ->
-[true] not be a surrogate
-*[false] be at most 10FFFF
-}")]
+    #[help("unicode escape sequences cannot be used as a byte or in a byte string")]
     UnicodeEscapeInByte(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("unicode escape in byte string")]
         Span,
     ),
     #[diag("empty unicode escape")]
     EmptyUnicodeEscape(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("this escape must have at least 1 hex digit")]
         Span,
     ),
     #[diag("empty character literal")]
     ZeroChars(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("empty character literal")]
         Span,
     ),
     #[diag("invalid trailing slash in literal")]
     LoneSlash(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("invalid trailing slash in literal")]
         Span,
     ),
     #[diag("whitespace symbol '{$ch}' is not skipped")]
     UnskippedWhitespace {
         #[primary_span]
         span: Span,
-        #[label("invalid escape")]
+        #[label("whitespace symbol '{$ch}' is not skipped")]
         char_span: Span,
         ch: String,
     },
     #[diag("multiple lines skipped by escaped newline")]
     MultipleSkippedLinesWarning(
         #[primary_span]
-        #[label("invalid escape")]
+        #[label("skipping everything up to and including this point")]
         Span,
     ),
     #[diag("character literal may only contain one codepoint")]
@@ -2210,7 +2210,7 @@ pub enum UnescapeError {
 #[derive(Subdiagnostic)]
 pub enum MoreThanOneCharSugg {
     #[suggestion(
-        parse_consider_normalized,
+        label = "consider using the normalized form `{$ch}` of this character" ,
         code = "{normalized}",
         applicability = "machine-applicable"
     )]
@@ -2220,14 +2220,17 @@ pub enum MoreThanOneCharSugg {
         ch: String,
         normalized: String,
     },
-    #[suggestion(parse_remove_non, code = "{ch}", applicability = "maybe-incorrect")]
+    #[suggestion(label = "consider removing the non-printing characters" , code = "{ch}", applicability = "maybe-incorrect")]
     RemoveNonPrinting {
         #[primary_span]
         span: Span,
         ch: String,
     },
     #[suggestion(
-        parse_use_double_quotes,
+        label = "if you meant to write a {$is_byte ->
+[true] byte string
+*[false] `str`
+} literal, use double quotes" ,
         code = "{sugg}",
         applicability = "machine-applicable"
     )]
@@ -2241,7 +2244,10 @@ pub enum MoreThanOneCharSugg {
 
 #[derive(Subdiagnostic)]
 pub enum MoreThanOneCharNote {
-    #[note(parse_followed_by)]
+    #[note("this `{$chr}` is followed by the combining {$len ->
+[one] mark
+*[other] marks
+} `{$escaped_marks}`")]
     AllCombining {
         #[primary_span]
         span: Span,
@@ -2249,7 +2255,7 @@ pub enum MoreThanOneCharNote {
         len: usize,
         escaped_marks: String,
     },
-    #[note(parse_non_printing)]
+    #[note("there are non-printing characters, the full sequence is `{$escaped}`")]
     NonPrinting {
         #[primary_span]
         span: Span,
@@ -2260,7 +2266,7 @@ pub enum MoreThanOneCharNote {
 #[derive(Subdiagnostic)]
 pub enum NoBraceUnicodeSub {
     #[suggestion(
-        parse_use_braces,
+        label = "format of unicode escape sequences uses braces" ,
         code = "{suggestion}",
         applicability = "maybe-incorrect"
     )]
@@ -2269,7 +2275,7 @@ pub enum NoBraceUnicodeSub {
         span: Span,
         suggestion: String,
     },
-    #[help(parse_format_of_unicode)]
+    #[help("format of unicode escape sequences is `\u{\"{...}\"}`")]
     Help,
 }
 
@@ -2403,7 +2409,7 @@ pub(crate) enum InvalidMutInPattern {
     #[note("`mut` may be followed by `variable` and `variable @ pattern`")]
     NonIdent {
         #[primary_span]
-        #[suggestion(label = "add `mut` to each binding", code = "{pat}", applicability = "machine-applicable")]
+        #[suggestion(label = "remove the `mut` prefix", code = "{pat}", applicability = "machine-applicable")]
         span: Span,
         pat: String,
     },
@@ -2813,10 +2819,16 @@ pub(crate) struct BoxNotPat {
 }
 
 #[derive(Diagnostic)]
-#[diag(parse_unmatched_angle)]
+#[diag("unmatched angle {$plural ->
+[true] brackets
+*[false] bracket
+}")]
 pub(crate) struct UnmatchedAngle {
     #[primary_span]
-    #[suggestion(code = "", applicability = "machine-applicable")]
+    #[suggestion(label = "remove extra angle {$plural ->
+[true] brackets
+*[false] bracket
+}", code = "", applicability = "machine-applicable")]
     pub span: Span,
     pub plural: bool,
 }

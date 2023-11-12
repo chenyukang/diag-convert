@@ -1,7 +1,7 @@
 use regex::Regex;
 use syn::{Attribute, Meta, MetaList, Path as SynPath, PathSegment, Type};
 
-pub fn replace_slug(content: &str, name: &str, slug: &str, to: &str) -> String {
+pub fn replace_slug(content: &str, slug: &str, to: &str) -> String {
     let mut result = content.to_string();
     let from = format!("({})", slug);
     if result.contains(from.as_str()) {
