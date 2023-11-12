@@ -5,6 +5,7 @@ use crate::visitor::SynVisitor;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Error;
+use std::process::Command;
 
 pub fn gen_code(ftl_file: &str, errors_path: &str, output: Option<String>) -> Result<(), Error> {
     let content = std::fs::read_to_string(&ftl_file).expect("read failed");
@@ -45,11 +46,22 @@ mod tests {
     fn test_gen_code() {
         let ftl_file = "tests/case1/test.ftl";
         let errors_path = "tests/case1/test.rs";
-        let output = "/tmp/output.rs";
-        let _ = fs::remove_file(output);
-        let _ = gen_code(ftl_file, errors_path, Some(output.to_string()));
-        let result = fs::read_to_string(output).unwrap();
-        let expected = fs::read_to_string("tests/case1/expect.rs").unwrap();
-        assert_eq!(result, expected);
+        let output_path = "/tmp/output.rs";
+        let expected_path = "tests/case1/expect.rs";
+        let _ = fs::remove_file(output_path);
+        let _ = gen_code(ftl_file, errors_path, Some(output_path.to_string()));
+        let result = fs::read_to_string(output_path).unwrap();
+        let expected = fs::read_to_string(expected_path).unwrap();
+        if result != expected {
+            // run diff to show the differences of the two files
+            let res = Command::new("diff")
+                .arg(expected_path)
+                .arg(output_path)
+                .output()
+                .expect("failed to execute diff");
+
+            println!("Diff output:\n{}", String::from_utf8_lossy(&res.stdout));
+            panic!("the result is diff from expected result ...");
+        }
     }
 }
