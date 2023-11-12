@@ -1616,21 +1616,21 @@ pub(crate) enum MissingKeywordForItemDefinition {
         span: Span,
         ident: Ident,
     },
-    #[diag(label = "missing `fn` for function definition")]
+    #[diag("missing `fn` for function definition")]
     Function {
         #[primary_span]
         #[suggestion(label = "add `struct` here to parse `{$ident}` as a public struct", style = "short", applicability = "maybe-incorrect", code = " fn ")]
         span: Span,
         ident: Ident,
     },
-    #[diag(label = "missing `fn` for method definition")]
+    #[diag("missing `fn` for method definition")]
     Method {
         #[primary_span]
         #[suggestion(label = "add `struct` here to parse `{$ident}` as a public struct", style = "short", applicability = "maybe-incorrect", code = " fn ")]
         span: Span,
         ident: Ident,
     },
-    #[diag(label = "missing `fn` or `struct` for function or struct definition")]
+    #[diag("missing `fn` or `struct` for function or struct definition")]
     Ambiguous {
         #[primary_span]
         span: Span,
@@ -1801,28 +1801,28 @@ pub(crate) enum UnexpectedTokenAfterStructName {
         span: Span,
         token: Token,
     },
-    #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found keyword `{$token}`")]
+    #[diag("expected `where`, `{`, `(`, or `;` after struct name, found keyword `{$token}`")]
     Keyword {
         #[primary_span]
         #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
-    #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found reserved keyword `{$token}`")]
+    #[diag("expected `where`, `{`, `(`, or `;` after struct name, found reserved keyword `{$token}`")]
     ReservedKeyword {
         #[primary_span]
         #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
-    #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found doc comment `{$token}`")]
+    #[diag("expected `where`, `{`, `(`, or `;` after struct name, found doc comment `{$token}`")]
     DocComment {
         #[primary_span]
         #[label("expected `where`, `{`, `(`, or `;` after struct name")]
         span: Span,
         token: Token,
     },
-    #[diag(label = "expected `where`, `{`, `(`, or `;` after struct name, found `{$token}`")]
+    #[diag("expected `where`, `{`, `(`, or `;` after struct name, found `{$token}`")]
     Other {
         #[primary_span]
         #[label("expected `where`, `{`, `(`, or `;` after struct name")]
@@ -1874,15 +1874,15 @@ pub(crate) struct MultipleWhereClauses {
 pub(crate) enum UnexpectedNonterminal {
     #[diag("expected an item keyword")]
     Item(#[primary_span] Span),
-    #[diag(label = "expected a statement")]
+    #[diag("expected a statement")]
     Statement(#[primary_span] Span),
-    #[diag(label = "expected ident, found `{$token}`")]
+    #[diag("expected ident, found `{$token}`")]
     Ident {
         #[primary_span]
         span: Span,
         token: Token,
     },
-    #[diag(label = "expected a lifetime, found `{$token}`")]
+    #[diag("expected a lifetime, found `{$token}`")]
     Lifetime {
         #[primary_span]
         span: Span,
@@ -1899,7 +1899,7 @@ pub(crate) enum TopLevelOrPatternNotAllowed {
         #[subdiagnostic]
         sub: Option<TopLevelOrPatternNotAllowedSugg>,
     },
-    #[diag(label = "top-level or-patterns are not allowed in function parameters")]
+    #[diag("top-level or-patterns are not allowed in function parameters")]
     FunctionParameter {
         #[primary_span]
         span: Span,
@@ -2071,7 +2071,7 @@ pub enum UnescapeError {
         span: Span,
         surrogate: bool,
     },
-    #[diag(label = "{$byte ->
+    #[diag("{$byte ->
 [true] byte
 *[false] character
 } constant must be escaped: `{$escaped_msg}`")]
@@ -2088,7 +2088,7 @@ pub enum UnescapeError {
         escaped_msg: String,
         byte: bool,
     },
-    #[diag(label = "{$double_quotes ->
+    #[diag("{$double_quotes ->
 [true] bare CR not allowed in string, use `\r` instead
 *[false] character constant must be escaped: `\r`
 }")]
@@ -2098,11 +2098,11 @@ pub enum UnescapeError {
         span: Span,
         double_quotes: bool,
     },
-    #[diag(label = "bare CR not allowed in raw string")]
+    #[diag("bare CR not allowed in raw string")]
     BareCrRawString(#[primary_span] Span),
-    #[diag(label = "numeric character escape is too short")]
+    #[diag("numeric character escape is too short")]
     TooShortHexEscape(#[primary_span] Span),
-    #[diag(label = "invalid character in {$is_hex ->
+    #[diag("invalid character in {$is_hex ->
 [true] numeric character
 *[false] unicode
 } escape: `{$ch}`")]
@@ -2113,26 +2113,26 @@ pub enum UnescapeError {
         is_hex: bool,
         ch: String,
     },
-    #[diag(label = "out of range hex escape")]
+    #[diag("out of range hex escape")]
     OutOfRangeHexEscape(
         #[primary_span]
         #[label("invalid escape")]
         Span,
     ),
-    #[diag(label = "invalid start of unicode escape: `_`")]
+    #[diag("invalid start of unicode escape: `_`")]
     LeadingUnderscoreUnicodeEscape {
         #[primary_span]
         #[label("invalid start of unicode escape")]
         span: Span,
         ch: String,
     },
-    #[diag(label = "overlong unicode escape")]
+    #[diag("overlong unicode escape")]
     OverlongUnicodeEscape(
         #[primary_span]
         #[label("invalid escape")]
         Span,
     ),
-    #[diag(label = "unterminated unicode escape")]
+    #[diag("unterminated unicode escape")]
     UnclosedUnicodeEscape(
         #[primary_span]
         #[label("invalid escape")]
@@ -2145,7 +2145,7 @@ pub enum UnescapeError {
         )]
         Span,
     ),
-    #[diag(label = "incorrect unicode escape sequence")]
+    #[diag("incorrect unicode escape sequence")]
     NoBraceInUnicodeEscape {
         #[primary_span]
         span: Span,
@@ -2154,7 +2154,7 @@ pub enum UnescapeError {
         #[subdiagnostic]
         sub: NoBraceUnicodeSub,
     },
-    #[diag(label = "unicode escape in byte string")]
+    #[diag("unicode escape in byte string")]
     #[help("unicode escape must {$surrogate ->
 [true] not be a surrogate
 *[false] be at most 10FFFF
@@ -2164,25 +2164,25 @@ pub enum UnescapeError {
         #[label("invalid escape")]
         Span,
     ),
-    #[diag(label = "empty unicode escape")]
+    #[diag("empty unicode escape")]
     EmptyUnicodeEscape(
         #[primary_span]
         #[label("invalid escape")]
         Span,
     ),
-    #[diag(label = "empty character literal")]
+    #[diag("empty character literal")]
     ZeroChars(
         #[primary_span]
         #[label("invalid escape")]
         Span,
     ),
-    #[diag(label = "invalid trailing slash in literal")]
+    #[diag("invalid trailing slash in literal")]
     LoneSlash(
         #[primary_span]
         #[label("invalid escape")]
         Span,
     ),
-    #[diag(label = "whitespace symbol '{$ch}' is not skipped")]
+    #[diag("whitespace symbol '{$ch}' is not skipped")]
     UnskippedWhitespace {
         #[primary_span]
         span: Span,
@@ -2190,13 +2190,13 @@ pub enum UnescapeError {
         char_span: Span,
         ch: String,
     },
-    #[diag(label = "multiple lines skipped by escaped newline")]
+    #[diag("multiple lines skipped by escaped newline")]
     MultipleSkippedLinesWarning(
         #[primary_span]
         #[label("invalid escape")]
         Span,
     ),
-    #[diag(label = "character literal may only contain one codepoint")]
+    #[diag("character literal may only contain one codepoint")]
     MoreThanOneChar {
         #[primary_span]
         span: Span,
@@ -2399,7 +2399,7 @@ pub(crate) enum InvalidMutInPattern {
         span: Span,
         pat: String,
     },
-    #[diag(label = "`mut` must be followed by a named binding")]
+    #[diag("`mut` must be followed by a named binding")]
     #[note("`mut` may be followed by `variable` and `variable @ pattern`")]
     NonIdent {
         #[primary_span]

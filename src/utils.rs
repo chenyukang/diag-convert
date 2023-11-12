@@ -4,12 +4,7 @@ use syn::{Attribute, Meta, MetaList, Path as SynPath, PathSegment, Type};
 pub fn replace_slug(content: &str, name: &str, slug: &str, to: &str) -> String {
     let mut result = content.to_string();
     let from = format!("({})", slug);
-    if name == "diag" {
-        result = result.replace(
-            format!("diag({})", slug).as_str(),
-            format!("diag(label = {})", to).as_str(),
-        );
-    } else if result.contains(from.as_str()) {
+    if result.contains(from.as_str()) {
         result = result.replace(from.as_str(), format!("({})", to).as_str());
     } else {
         result = result.replace(
