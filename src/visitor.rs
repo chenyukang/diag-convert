@@ -38,6 +38,7 @@ pub struct SynVisitor {
     pub cur_item_name: Vec<(String, String)>,
     pub cur_source: Vec<String>,
     pub attrs: HashMap<String, Vec<Attribute>>,
+    pub path_replace: Vec<String>,
 }
 
 impl SynVisitor {
@@ -122,18 +123,13 @@ impl SynVisitor {
                 .insert(entry.slug.to_string(), entry.clone());
         }
 
-        let res = self.fluent_source.get("parse_invalid_char_in_escape");
-        eprintln!("now fuck one: {:#?}", res);
+        self.fluent_source.get("parse_invalid_char_in_escape");
     }
 
     fn get_entry_from_struct(&self, error_struct: &ErrorStruct) -> Option<&crate::Entry> {
         let slug = error_struct.slug.clone();
         if let Some(slug) = slug {
             if let Some(entry) = self.fluent_source.get(&slug) {
-                // eprintln!(
-                //     "get_entry_from_struct got entry: {:#?}\n by slug: {:?}",
-                //     entry, slug
-                // );
                 return Some(entry);
             }
         }
@@ -234,6 +230,18 @@ impl SynVisitor {
         let mut output = self.file_source_code.to_string();
         for (from, to) in error_struct_outputs.iter() {
             output = output.replace(from, to);
+        }
+
+        let root = self.fluent_source.get("*root*").unwrap();
+        for path in self.path_replace.iter() {
+            let elems = path.split("::").collect::<Vec<_>>();
+            if elems.len() == 2 && elems[0] == "fluent" {
+                eprintln!("path: {:#?}", elems);
+                let slug = elems[1];
+                let value = root.get_value_from_slug(slug).unwrap();
+                let replace = format!("DiagnosticMessage::Str(Cow::from({}))", &value);
+                output = output.replace(path, &replace);
+            }
         }
         return output;
     }
@@ -365,6 +373,14 @@ impl<'ast> Visit<'ast> for SynVisitor {
                 .push(i.clone());
         }
         visit::visit_attribute(self, i);
+    }
+
+    fn visit_path(&mut self, i: &'ast syn::Path) {
+        eprintln!("visiting path: {:#?}", i);
+        visit::visit_path(self, i);
+        let source = i.span().source_text().unwrap().to_string();
+        eprintln!("path source: {}", source);
+        self.path_replace.push(source);
     }
 
     fn visit_item_enum(&mut self, i: &'ast syn::ItemEnum) {

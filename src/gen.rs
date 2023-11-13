@@ -5,7 +5,6 @@ use crate::visitor::SynVisitor;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Error;
-use std::process::Command;
 
 pub fn gen_code(ftl_file: &str, errors_path: &str, output: Option<String>) -> Result<(), Error> {
     let content = std::fs::read_to_string(&ftl_file).expect("read failed");
@@ -22,15 +21,13 @@ pub fn gen_code(ftl_file: &str, errors_path: &str, output: Option<String>) -> Re
         attrs: HashMap::new(),
         cur_item_name: vec![],
         cur_source: vec![],
+        path_replace: vec![],
     };
     visitor.init_with_syntax(&syntax);
 
     visitor.set_fluent_source(&parser.entries);
     let result = visitor.gen_source_code();
     if let Some(output) = output {
-        if result.contains("_in_raw_string") {
-            eprintln!("fuck !!");
-        }
         fs::write(output, result)?;
     } else {
         println!("{}", result);
@@ -42,6 +39,7 @@ pub fn gen_code(ftl_file: &str, errors_path: &str, output: Option<String>) -> Re
 mod tests {
     use super::*;
     use std::fs;
+    use std::process::Command;
 
     #[test]
     fn test_gen_code() {
