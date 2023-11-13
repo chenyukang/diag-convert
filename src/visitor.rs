@@ -229,12 +229,17 @@ impl SynVisitor {
         }
 
         let root = self.fluent_source.get("*root*").unwrap();
+        let mut cur_entry = root.clone();
         for path in self.path_replace.iter() {
             let elems = path.split("::").collect::<Vec<_>>();
             if elems.len() == 2 && elems[0] == "fluent" {
                 eprintln!("path: {:#?}", elems);
                 let slug = elems[1];
-                let value = root.get_value_from_slug(slug).unwrap();
+                if let Some(entry) = self.fluent_source.get(slug) {
+                    cur_entry = entry.clone();
+                }
+                let value = cur_entry.get_value_from_slug(slug).unwrap();
+                //let value = root.get_value_from_slug(slug).unwrap();
                 let replace = format!("DiagnosticMessage::Str(Cow::from({}))", &value);
                 output = output.replace(path, &replace);
             }

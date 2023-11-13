@@ -41,14 +41,9 @@ mod tests {
     use std::fs;
     use std::process::Command;
 
-    #[test]
-    fn test_gen_code() {
-        let ftl_file = "tests/case1/test.ftl";
-        let errors_path = "tests/case1/test.rs";
-        let output_path = "/tmp/output.rs";
-        let expected_path = "tests/case1/expect.rs";
+    fn single_test(ftl_file: &str, code_path: &str, expected_path: &str, output_path: &str) {
         let _ = fs::remove_file(output_path);
-        let _ = gen_code(ftl_file, errors_path, Some(output_path.to_string()));
+        let _ = gen_code(ftl_file, code_path, Some(output_path.to_string()));
         let result = fs::read_to_string(output_path).unwrap();
         let expected = fs::read_to_string(expected_path).unwrap();
         if result != expected {
@@ -60,7 +55,28 @@ mod tests {
                 .expect("failed to execute diff");
 
             println!("Diff output:\n{}", String::from_utf8_lossy(&res.stdout));
+            eprintln!("diff cmd: diff {} {}", expected_path, output_path);
             panic!("the result is diff from expected result ...");
         }
+    }
+
+    #[test]
+    fn test_gen_code() {
+        single_test(
+            "tests/case1/test.ftl",
+            "tests/case1/test.rs",
+            "tests/case1/expect.rs",
+            "/tmp/errors-gen.rs",
+        );
+    }
+
+    #[test]
+    fn test_path_gen() {
+        single_test(
+            "tests/case1/test.ftl",
+            "tests/path-fix/input.rs",
+            "tests/path-fix/expect.rs",
+            "/tmp/path-gen.rs",
+        );
     }
 }
