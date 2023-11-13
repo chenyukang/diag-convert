@@ -135,10 +135,6 @@ impl SynVisitor {
         }
 
         if let Some(parent_name) = &error_struct.parent_diag {
-            // eprintln!(
-            //     "got parent_diag: {:#?} {:?}",
-            //     error_struct.slug, parent_name
-            // );
             let parent_index = self.find_error_by_diag_name(parent_name).unwrap();
             self.get_entry_from_struct(self.errors.get(parent_index).unwrap())
         } else {
@@ -288,10 +284,8 @@ impl SynVisitor {
                 || attr.path().is_ident("suggestion")
             {
                 let _ = attr.parse_nested_meta(|meta| {
-                    //eprintln!("Attr with name={:#?}", meta.path);
                     let first_segment = meta.path.segments.first().unwrap();
                     let _slug = first_segment.ident.to_string();
-                    //eprintln!("Attr with name={:#?}", _slug);
                     if slug.is_none() {
                         slug = Some(_slug);
                     }
@@ -299,8 +293,6 @@ impl SynVisitor {
                 });
             }
         }
-        //eprint!("diag_name: {:#?}, slug: {:#?}", diag_name, slug);
-        //eprintln!("field: {:#?}", field);
         for attr in attrs.iter() {
             let variants = vec![
                 "suggestion",
@@ -317,26 +309,20 @@ impl SynVisitor {
                         if let Some(slug_segment) = meta.path.segments.first() {
                             let _slug = slug_segment.ident.to_string();
                             if _slug != "style" && _slug != "code" && _slug != "applicability" {
-                                //eprintln!("add here {} => {:#?}", key, _slug);
                                 field_labels.insert((key.to_string(), _slug.to_string()));
                                 added = true;
                             }
                         } else {
-                            //eprintln!("Attr with name={:#?}", meta.path);
                             panic!("not found slug");
                         }
                         Ok(())
                     });
                     if !added {
-                        //eprintln!("add default label: {}", key);
                         field_labels.insert((key.to_string(), "_".to_string()));
                     }
                 }
             }
         }
-        // eprintln!("diag_name: {:#?}", diag_name);
-        // eprintln!("field_labels: {:#?}", field_labels);
-        // eprintln!("diag_type: {:?}", diag_type);
         let parent_diag = if self.cur_item_name.len() >= 2 {
             self.cur_item_name
                 .get(self.cur_item_name.len() - 2)
@@ -363,9 +349,6 @@ impl SynVisitor {
 
 impl<'ast> Visit<'ast> for SynVisitor {
     fn visit_attribute(&mut self, i: &'ast Attribute) {
-        // eprintln!("cur_diag_name: {:#?}", self.cur_diag_name());
-        // eprintln!("visiting attr: {:#?}", i);
-
         if let Some(diag_name) = self.cur_diag_name() {
             self.attrs
                 .entry(diag_name)
