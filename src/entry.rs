@@ -28,12 +28,10 @@ impl Entry {
 
     pub fn get_value_from_slug(&self, slug: &str) -> Option<String> {
         let _format = |v: &str| -> String {
-            let v = v.replace("{\"{\"}", "{").replace("{\"}\"}", "}");
-            let v = v.trim();
-            if !v.contains("\"") {
-                format!("\"{}\"", v)
+            if v.contains("\"") {
+                format!("r#\"{}\"#", v)
             } else {
-                format!("\"{}\"", v.replace("\"", "\\\""))
+                format!("\"{}\"", v)
             }
         };
         if slug == self.slug {
